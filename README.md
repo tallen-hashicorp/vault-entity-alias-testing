@@ -1,6 +1,59 @@
 # Vault Entity Alias Testing
 Create an entity representing Bob, and associate aliases representing each of his accounts as the entity member. You can set additional policies and metadata on the entity level so that both accounts can inherit. This example was created using the [Identity: entities and groups](https://developer.hashicorp.com/vault/tutorials/auth-methods/identity) guide.
 
+### Does an entity alias always inherent a policy
+
+Each user may have multiple accounts with various identity providers, and Vault supports many of those providers to authenticate with Vault. Vault Identity can tie authentications from various auth methods to a single representation. This representation of a consolidated identity is called an Entity and their corresponding accounts with authentication providers can be mapped as Aliases. In essence, each entity is made up of zero or more aliases. An entity cannot have more than one alias for a particular authentication backend.
+
+For example, a user with accounts in both GitHub and LDAP can be mapped to a single entity in Vault with two aliases, one of type GitHub and one of type LDAP
+
+![Untitled](diagram/bob_entity.avif)
+
+When a client authenticates via any credential backend (except the Token backend), Vault creates a new entity. It attaches a new alias to it if a corresponding entity does not already exist. The entity identifier will be tied to the authenticated token. When such tokens are used, their entity identifiers are audit logged, marking a trail of actions performed by specific users.
+
+Entities in Vault **do not** automatically pull identity information from anywhere. It needs to be explicitly managed by operators. This way, it is flexible in terms of administratively controlling the number of entities to be synced against Vault. In some sense, Vault will serve as a *cache* of identities and not as a *source* of identities.
+
+Vault policies can be assigned to entities which will grant *additional* permissions to the token on top of the existing policies on the token. If the token presented on the API request contains an identifier for the entity and if that entity has a set of policies on it, then the token will be capable of performing actions allowed by the policies on the entity as well.
+
+![Untitled](diagram/bob_entity.avif)
+
+This is a paradigm shift in terms of *when* the policies of the token get evaluated. Before identity, the policy names on the token were immutable (not the contents of those policies though). But with entity policies, along with the immutable set of policy names on the token, the evaluation of policies applicable to the token through its identity will happen at request time. This also adds enormous flexibility to control the behavior of already issued tokens.
+
+It is important to note that the policies on the entity are only a means to grant *additional* capabilities and not a replacement for the policies on the token. To know the full set of capabilities of the token with an associated entity identifier, the policies on the token should be taken into account.
+
+Below is an example of the policy, permission and entities created in the [Identity: entities and groups](https://developer.hashicorp.com/vault/tutorials/auth-methods/identity) guide:
+
+![bob.png](diagram/bob.png)
+
+- In the above example, there are 3 policies: `base`, `test`, and `team-qa`.
+- The user `bob` is assigned the `test` policy, which allows access to `secret/data/test`.
+- The user `bsmith` is assigned the `team-qa` policy, which allows access to `secret/data/team-qa`.
+- An entity called `bob-smith` is created with `bob` and `bsmith` as aliases.
+- When logging in as `bob`, the user can access `secret/data/test` according to the assigned policy. The user can also access `secret/data/training_*` as it inherits the parent's policies. However, `bob` is not able to access `secret/data/team-qa`.
+
+```
+bob: secret/data/training_test:
+create, read
+
+bob: secret/data/test:
+create, delete, read, update
+
+bob: secret/data/team-qa:
+deny
+
+-----------------------------
+
+bsmith: secret/data/training_test:
+create, read
+
+bsmith: secret/data/test:
+deny
+
+bsmith: secret/data/team-qa:
+create, delete, read, update
+```
+
+## Manual Insructions
 1. Create `base` policy.
     
     ```bash
@@ -122,5 +175,3 @@ Create an entity representing Bob, and associate aliases representing each of hi
     ```bash
     $ vault read -format=json identity/entity/id/$(cat entity_id.txt) | jq -r ".data"
     ```
-
----

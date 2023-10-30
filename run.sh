@@ -47,13 +47,38 @@ vault write identity/entity-alias name="bsmith" \
 echo "Alias now setup, about to start testing this"
 sleep 5
 
+echo "-----------------------------"
 vault login -format=json -method=userpass -path=userpass-test \
     username=bob password=training \
     | jq -r ".auth.client_token" > bob_token.txt
 VAULT_TOKEN=$(cat bob_token.txt) vault kv put secret/test owner="bob"
+echo ""
+echo "bob: secret/data/training_test:"
 VAULT_TOKEN=$(cat bob_token.txt) vault token capabilities secret/data/training_test
+echo ""
+echo "bob: secret/data/test:"
+VAULT_TOKEN=$(cat bob_token.txt) vault token capabilities secret/data/test
+echo ""
+echo "bob: secret/data/team-qa:"
 VAULT_TOKEN=$(cat bob_token.txt) vault token capabilities secret/data/team-qa
+echo "-----------------------------"
+
+vault login -format=json -method=userpass -path=userpass-qa \
+    username=bsmith password=training \
+    | jq -r ".auth.client_token" > bsmith_token.txt
+echo ""
+echo "bsmith: secret/data/training_test:"
+VAULT_TOKEN=$(cat bsmith_token.txt) vault token capabilities secret/data/training_test
+echo ""
+echo "bsmith: secret/data/test:"
+VAULT_TOKEN=$(cat bsmith_token.txt) vault token capabilities secret/data/test
+echo ""
+echo "bsmith: secret/data/team-qa:"
+VAULT_TOKEN=$(cat bsmith_token.txt) vault token capabilities secret/data/team-qa
+echo ""
+echo "-----------------------------"
 echo "All done, cleaning up files"
+
 sleep 1
 
 rm bob_token.txt
