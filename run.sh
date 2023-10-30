@@ -85,4 +85,5 @@ rm bob_token.txt
 rm accessor_test.txt
 rm accessor_qa.txt
 rm entity_id.txt
+rm bsmith_token.txt
 unset VAULT_TOKEN
